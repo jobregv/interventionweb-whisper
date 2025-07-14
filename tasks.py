@@ -1,9 +1,10 @@
-# 📁 transcription_service/tasks.py - VPS VERSION con FIX MÍNIMO
+# 📁 transcription_service/tasks.py - VPS VERSION con WebM fix
 import tempfile
 import os
 import logging
 import requests
 import time
+import subprocess
 from faster_whisper import WhisperModel
 from urllib.parse import urlparse, urlunparse
 
@@ -83,6 +84,22 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
         with tempfile.NamedTemporaryFile(suffix=audio_format, delete=False) as tmp:
             tmp.write(audio_bytes)
             temp_path = tmp.name
+
+        # 🔧 CONVERTIR WebM a WAV si es necesario
+        if audio_format == ".webm":
+            wav_path = temp_path.replace(".webm", ".wav")
+            try:
+                subprocess.run([
+                    "ffmpeg", "-i", temp_path, 
+                    "-ar", "16000", "-ac", "1", 
+                    wav_path, "-y"
+                ], check=True, capture_output=True)
+                os.unlink(temp_path)  # Eliminar WebM original
+                temp_path = wav_path
+                logger.info(f"🔄 [PROCESS {process_id}] Convertido WebM -> WAV")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"❌ [PROCESS {process_id}] Error convirtiendo WebM: {e}")
+                raise ValueError(f"Error convirtiendo WebM a WAV: {e}")
         
         # Validar tamaño de archivo
         file_size_mb = len(audio_bytes) / (1024 * 1024)
@@ -99,7 +116,7 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
         
         try:
             segments, info = whisper_model.transcribe(
-                temp_path, 
+                temp_path,
                 beam_size=3,                      # 🔥 COMPROMISO: de 5 a 3
                 language="es",
                 condition_on_previous_text=False  # 🔥 CLAVE: Evita repeticiones

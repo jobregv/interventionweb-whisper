@@ -86,17 +86,21 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
             temp_path = tmp.name
 
         # 🔧 CONVERTIR WebM a WAV si es necesario
+        # 🔧 CONVERTIR WebM a WAV si es necesario - OPTIMIZADO
         if audio_format == ".webm":
             wav_path = temp_path.replace(".webm", ".wav")
             try:
                 subprocess.run([
-                    "ffmpeg", "-i", temp_path, 
-                    "-ar", "16000", "-ac", "1", 
+                    "/usr/bin/ffmpeg", "-i", temp_path,
+                    "-ar", "16000", "-ac", "1", "-f", "wav",
+                    "-acodec", "pcm_s16le",  # Codec específico más rápido
+                    "-threads", "1",         # Una thread por conversión
+                    "-preset", "ultrafast",  # Preset más rápido
                     wav_path, "-y"
                 ], check=True, capture_output=True)
-                os.unlink(temp_path)  # Eliminar WebM original
+                os.unlink(temp_path)
                 temp_path = wav_path
-                logger.info(f"🔄 [PROCESS {process_id}] Convertido WebM -> WAV")
+                logger.info(f"🔄 [PROCESS {process_id}] Convertido WebM -> WAV (optimizado)")
             except subprocess.CalledProcessError as e:
                 logger.error(f"❌ [PROCESS {process_id}] Error convirtiendo WebM: {e}")
                 raise ValueError(f"Error convirtiendo WebM a WAV: {e}")

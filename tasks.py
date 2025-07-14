@@ -87,20 +87,23 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
 
         # 🔧 CONVERTIR WebM a WAV si es necesario
         # 🔧 CONVERTIR WebM a WAV si es necesario - OPTIMIZADO
+        # 🔧 CONVERTIR WebM a WAV si es necesario - ULTRA OPTIMIZADO
         if audio_format == ".webm":
             wav_path = temp_path.replace(".webm", ".wav")
             try:
                 subprocess.run([
                     "/usr/bin/ffmpeg", "-i", temp_path,
                     "-ar", "16000", "-ac", "1", "-f", "wav",
-                    "-acodec", "pcm_s16le",  # Codec específico más rápido
-                    "-threads", "1",         # Una thread por conversión
-                    "-preset", "ultrafast",  # Preset más rápido
+                    "-acodec", "pcm_s16le",     # Codec específico
+                    "-af", "volume=1.0",        # Normalizar volumen (ayuda a Whisper)
+                    "-threads", "1",            # Una thread
+                    "-preset", "ultrafast",     # Máxima velocidad
+                    "-avoid_negative_ts", "make_zero",  # Evitar timestamps negativos
                     wav_path, "-y"
                 ], check=True, capture_output=True)
                 os.unlink(temp_path)
                 temp_path = wav_path
-                logger.info(f"🔄 [PROCESS {process_id}] Convertido WebM -> WAV (optimizado)")
+                logger.info(f"🔄 [PROCESS {process_id}] Convertido WebM -> WAV (ultra optimizado)")
             except subprocess.CalledProcessError as e:
                 logger.error(f"❌ [PROCESS {process_id}] Error convirtiendo WebM: {e}")
                 raise ValueError(f"Error convirtiendo WebM a WAV: {e}")
@@ -121,9 +124,13 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
         try:
             segments, info = whisper_model.transcribe(
                 temp_path,
-                beam_size=3,                      # 🔥 COMPROMISO: de 5 a 3
+                beam_size=3,
                 language="es",
-                condition_on_previous_text=False  # 🔥 CLAVE: Evita repeticiones
+                condition_on_previous_text=False,
+                word_timestamps=Config.WHISPER_WORD_TIMESTAMPS,
+                # 🚀 Estas SÍ pueden dar 1-2s de ganancia
+                suppress_blank=True,
+                without_timestamps=True
             )
         except Exception as transcription_error:
             # Error específico de transcripción

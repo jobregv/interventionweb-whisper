@@ -1,4 +1,4 @@
-# 📁 transcription_service/config.py - VPS VERSION
+# 📁 transcription_service/config.py - VPS VERSION OPTIMIZADO
 import os
 import subprocess
 import socket
@@ -32,6 +32,11 @@ class Config:
     WHISPER_MODEL: str = os.getenv('WHISPER_MODEL', 'medium')
     WHISPER_DEVICE: str = os.getenv('WHISPER_DEVICE', 'cpu')
     WHISPER_COMPUTE_TYPE: str = os.getenv('WHISPER_COMPUTE_TYPE', 'int8')
+    
+    # 🚀 Optimizaciones Whisper
+    WHISPER_NUM_WORKERS: int = int(os.getenv('WHISPER_NUM_WORKERS', '1'))
+    WHISPER_CPU_THREADS: int = int(os.getenv('WHISPER_CPU_THREADS', '1'))
+    WHISPER_WORD_TIMESTAMPS: bool = os.getenv('WHISPER_WORD_TIMESTAMPS', 'true').lower() == 'true'
     
     # Celery Configuration
     WORKER_CONCURRENCY: int = int(os.getenv('WORKER_CONCURRENCY', '3'))
@@ -91,6 +96,10 @@ class Config:
         print(f"🔍 Validando configuración VPS...")
         print(f"   - Redis URL: {cls.REDIS_URL}")
         print(f"   - Whisper Model: {cls.WHISPER_MODEL}")
+        print(f"   - Whisper Compute Type: {cls.WHISPER_COMPUTE_TYPE}")
+        print(f"   - Whisper Workers: {cls.WHISPER_NUM_WORKERS}")
+        print(f"   - Whisper CPU Threads: {cls.WHISPER_CPU_THREADS}")
+        print(f"   - Word Timestamps: {cls.WHISPER_WORD_TIMESTAMPS}")
         print(f"   - Worker Concurrency: {cls.WORKER_CONCURRENCY}")
         print(f"   - Max File Size: {cls.MAX_FILE_SIZE // (1024*1024)}MB")
         print(f"   - Log Level: {cls.LOG_LEVEL}")

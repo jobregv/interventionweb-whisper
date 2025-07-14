@@ -1,4 +1,4 @@
-# 📁 transcription_service/tasks.py - VPS VERSION
+# 📁 transcription_service/tasks.py - VPS VERSION con FIX MÍNIMO
 import tempfile
 import os
 import logging
@@ -100,8 +100,9 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
         try:
             segments, info = whisper_model.transcribe(
                 temp_path, 
-                beam_size=5, 
-                language="es"
+                beam_size=3,                      # 🔥 COMPROMISO: de 5 a 3
+                language="es",
+                condition_on_previous_text=False  # 🔥 CLAVE: Evita repeticiones
             )
         except Exception as transcription_error:
             # Error específico de transcripción
@@ -110,8 +111,32 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
             else:
                 raise  # Re-lanzar otros errores
         
-        segment_texts = [segment.text for segment in segments]
-        transcription = "".join(segment_texts).strip()
+        # 🔥 CAMBIO CRÍTICO: Unir con espacios y limpiar duplicados
+        segment_texts = []
+        seen_texts = set()
+        
+        # 🔍 DEBUG: Ver qué está pasando
+        segment_count = 0
+        for segment in segments:
+            segment_count += 1
+            text = segment.text.strip()
+            
+            # Log de los primeros 5 segmentos para debug
+            if segment_count <= 5:
+                logger.info(f"🔍 [DEBUG] Segmento {segment_count}: '{text}'")
+            
+            # Solo añadir si no está vacío y no es duplicado
+            if text and text not in seen_texts:
+                segment_texts.append(text)
+                seen_texts.add(text)
+            elif text in seen_texts:
+                logger.info(f"🔄 [DEBUG] Segmento duplicado ignorado: '{text}'")
+        
+        logger.info(f"🔍 [DEBUG] Total segmentos procesados: {segment_count}")
+        logger.info(f"🔍 [DEBUG] Segmentos únicos: {len(segment_texts)}")
+        
+        # Unir con espacios (en lugar de sin espacios)
+        transcription = " ".join(segment_texts).strip()
         
         transcription_time = time.time() - transcription_start
         total_time = time.time() - start_time
@@ -120,7 +145,7 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
             raise ValueError("Transcripción vacía")
         
         logger.info(f"✅ [PROCESS {process_id}] COMPLETADO - JobID: {actual_job_id}")
-        logger.info(f"   📝 Texto: {transcription[:50]}...")
+        logger.info(f"   📝 Texto ({len(transcription)} chars): {transcription[:100]}...")
         logger.info(f"   ⏱️  Transcripción: {transcription_time:.2f}s")
         logger.info(f"   ⏱️  Total: {total_time:.2f}s")
         

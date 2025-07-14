@@ -83,7 +83,7 @@ from .tasks import celery
 
 # Este archivo se usa para lanzar el worker desde la línea de comandos
 # Ejecuta: celery -A celery_worker.celery worker --loglevel=info --concurrency=3
-# 📁 transcription_service/config.py - SOLUCIÓN PERMANENTE
+# 📁 transcription_service/config.py - VPS VERSION
 import os
 import subprocess
 import socket
@@ -114,7 +114,7 @@ class Config:
     REDIS_URL: str = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     
     # Whisper Model Configuration
-    WHISPER_MODEL: str = os.getenv('WHISPER_MODEL', 'small')
+    WHISPER_MODEL: str = os.getenv('WHISPER_MODEL', 'medium')
     WHISPER_DEVICE: str = os.getenv('WHISPER_DEVICE', 'cpu')
     WHISPER_COMPUTE_TYPE: str = os.getenv('WHISPER_COMPUTE_TYPE', 'int8')
     
@@ -127,10 +127,8 @@ class Config:
     CALLBACK_TIMEOUT: int = int(os.getenv('CALLBACK_TIMEOUT', '10'))
     CALLBACK_RETRIES: int = int(os.getenv('CALLBACK_RETRIES', '3'))
     
-    # 🎯 WSL/Windows Bridge Configuration - PERMANENTE
     # 🎯 VPS Configuration - Backend en Railway
-    BACKEND_URL: str = os.getenv('BACKEND_URL', 'https://interventionweb-backend-development.up.railway.app')  # IP fija que funciona
-    SPRING_BOOT_PORT: int = int(os.getenv('SPRING_BOOT_PORT', '8080'))
+    BACKEND_URL: str = os.getenv('BACKEND_URL', 'https://interventionweb-backend-development.up.railway.app')
     
     # File Configuration
     MAX_FILE_SIZE: int = int(os.getenv('MAX_FILE_SIZE', '50')) * 1024 * 1024  # 50MB default
@@ -144,51 +142,12 @@ class Config:
     API_PORT: int = int(os.getenv('API_PORT', '8000'))
     
     @classmethod
-    def get_windows_host_ip(cls) -> str:
-        """
-        🎯 SOLUCIÓN PERMANENTE: Usar IP configurada o fija conocida
-        """
-        configured_ip = cls.WINDOWS_HOST_IP
-        
-        # Si hay IP configurada, usarla
-        if configured_ip and configured_ip != 'auto':
-            print(f"✅ Usando IP configurada permanentemente: {configured_ip}")
-            return configured_ip
-        
-        # 🔍 Detectar si estamos en Windows o WSL
-        import platform
-        is_windows = platform.system() == "Windows"
-        
-        if is_windows:
-            print(f"🪟 Ejecutándose en Windows - usando localhost")
-            return "localhost"
-        
-        # Para WSL: IP fija conocida que funciona para este sistema
-        known_working_ip = "192.168.48.1"
-        print(f"✅ WSL detectado - usando IP fija conocida: {known_working_ip}")
-        
-        # Verificar que la IP funciona (opcional, no bloqueante)
-        try:
-            import socket
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(2)
-            result = sock.connect_ex((known_working_ip, cls.SPRING_BOOT_PORT))
-            sock.close()
-            
-            if result == 0:
-                print(f"✅ IP {known_working_ip} verificada y accesible")
-            else:
-                print(f"⚠️ IP {known_working_ip} no responde ahora, pero usando como configurada")
-                
-        except Exception as e:
-            print(f"⚠️ No se pudo verificar conectividad: {e}")
-        
-        return known_working_ip
-    
-    @classmethod
     def get_callback_base_url(cls) -> str:
+        """
+        🌐 Construye la URL base para callbacks desde VPS a Railway
+        """
         return cls.BACKEND_URL
- 
+    
     @classmethod
     def test_spring_boot_connectivity(cls) -> bool:
         """
@@ -214,20 +173,19 @@ class Config:
     @classmethod
     def validate(cls):
         """Valida la configuración al inicio"""
-        print(f"🔍 Validando configuración...")
+        print(f"🔍 Validando configuración VPS...")
         print(f"   - Redis URL: {cls.REDIS_URL}")
         print(f"   - Whisper Model: {cls.WHISPER_MODEL}")
         print(f"   - Worker Concurrency: {cls.WORKER_CONCURRENCY}")
         print(f"   - Max File Size: {cls.MAX_FILE_SIZE // (1024*1024)}MB")
         print(f"   - Log Level: {cls.LOG_LEVEL}")
         
-        # Mostrar configuración WSL->Windows
-        print(f"\n🌐 Configuración WSL->Windows:")
-        windows_ip = cls.get_windows_host_ip()
+        # Mostrar configuración VPS->Railway
+        print(f"\n🌐 Configuración VPS->Railway:")
         callback_url = cls.get_callback_base_url()
-        print(f"   - IP Windows configurada: {windows_ip}")
-        print(f"   - Callback URL: {callback_url}")
-        print(f"   - Configuración: PERMANENTE")
+        print(f"   - Backend URL: {callback_url}")
+        print(f"   - API Host: {cls.API_HOST}:{cls.API_PORT}")
+        print(f"   - Configuración: VPS OPTIMIZADA")
         
         print(f"✅ Configuración validada")
         return True
@@ -395,7 +353,7 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=Config.API_HOST, port=Config.API_PORT)
-# 📁 transcription_service/tasks.py - ENTERPRISE SOLUTION
+# 📁 transcription_service/tasks.py - VPS VERSION
 import tempfile
 import os
 import logging
@@ -410,7 +368,7 @@ from config import Config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Modelo por proceso para WSL
+# Modelo por proceso para VPS
 _process_model = None
 _process_id = None
 
@@ -420,38 +378,26 @@ def get_whisper_model():
     current_pid = os.getpid()
     
     if _process_model is None or _process_id != current_pid:
-        logger.info(f"🔄 [PROCESS {current_pid}] Cargando modelo Whisper...")
+        logger.info(f"🔄 [PROCESS {current_pid}] Cargando modelo Whisper {Config.WHISPER_MODEL}...")
         start_time = time.time()
         
-        _process_model = WhisperModel("medium", device="cpu", compute_type="int8")
+        _process_model = WhisperModel(
+            Config.WHISPER_MODEL, 
+            device=Config.WHISPER_DEVICE, 
+            compute_type=Config.WHISPER_COMPUTE_TYPE
+        )
         _process_id = current_pid
         
         load_time = time.time() - start_time
-        logger.info(f"✅ [PROCESS {current_pid}] Modelo cargado en {load_time:.2f}s")
+        logger.info(f"✅ [PROCESS {current_pid}] Modelo {Config.WHISPER_MODEL} cargado en {load_time:.2f}s")
     
     return _process_model
 
-def fix_callback_url_for_wsl(original_url: str) -> str:
-    """Corrige URLs de callback para WSL hacia Windows"""
-    if not original_url:
-        return original_url
-    
-    try:
-        parsed = urlparse(original_url)
-        
-        if parsed.hostname in ['localhost', '127.0.0.1']:
-            windows_ip = Config.get_windows_host_ip()
-            new_netloc = f"{windows_ip}:{parsed.port}" if parsed.port else windows_ip
-            fixed_parsed = parsed._replace(netloc=new_netloc)
-            fixed_url = urlunparse(fixed_parsed)
-            logger.info(f"🔧 [WSL] URL corregida: {original_url} -> {fixed_url}")
-            return fixed_url
-        
-        return original_url
-        
-    except Exception as e:
-        logger.warning(f"⚠️ Error corrigiendo URL {original_url}: {e}")
-        return original_url
+def fix_callback_url(original_url: str) -> str:
+    """
+    🎯 VPS: No necesita arreglos, devuelve URL tal como viene
+    """
+    return original_url
 
 @celery_app.task(name="transcribe_audio_with_callback", bind=True)
 def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None, 
@@ -460,7 +406,7 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
     actual_job_id = job_id or self.request.id
     process_id = os.getpid()
     
-    fixed_callback_url = fix_callback_url_for_wsl(callback_url)
+    fixed_callback_url = fix_callback_url(callback_url)
     
     try:
         logger.info(f"🎤 [PROCESS {process_id}] INICIANDO transcripción - JobID: {actual_job_id}")
@@ -504,7 +450,7 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
         whisper_model = get_whisper_model()
         
         transcription_start = time.time()
-        logger.info(f"🔄 [PROCESS {process_id}] TRANSCRIBIENDO...")
+        logger.info(f"🔄 [PROCESS {process_id}] TRANSCRIBIENDO con {Config.WHISPER_MODEL}...")
         
         try:
             segments, info = whisper_model.transcribe(
@@ -533,7 +479,7 @@ def transcribe_audio_with_callback(self, audio_bytes: bytes, job_id: str = None,
         logger.info(f"   ⏱️  Transcripción: {transcription_time:.2f}s")
         logger.info(f"   ⏱️  Total: {total_time:.2f}s")
         
-        # 🏢 ENTERPRISE CALLBACK: Simple, sin sleep
+        # 🏢 ENTERPRISE CALLBACK: Simple y directo
         if fixed_callback_url:
             callback_start = time.time()
             send_enterprise_callback(fixed_callback_url, actual_job_id, "completed", 
@@ -570,10 +516,9 @@ def send_enterprise_callback(callback_url: str, job_id: str, status: str,
                            transcription: str = None, error: str = None, 
                            callback_token: str = None, process_id: int = None):
     """
-    🏢 ENTERPRISE CALLBACK: Simple, directo, sin sleep
+    🏢 ENTERPRISE CALLBACK: VPS -> Railway Backend
     
-    Spring Boot ya tiene la referencia cuando llega este callback.
-    No necesitamos esperas ni reintentos complejos.
+    Directo y confiable - Railway backend está siempre disponible.
     """
     if process_id is None:
         process_id = os.getpid()
@@ -597,7 +542,7 @@ def send_enterprise_callback(callback_url: str, job_id: str, status: str,
             if callback_token:
                 headers["Authorization"] = f"Bearer {callback_token}"
             
-            logger.info(f"📞 [PROCESS {process_id}] Callback enterprise (intento {attempt}/{max_retries}) - JobID: {job_id}")
+            logger.info(f"📞 [PROCESS {process_id}] Callback VPS->Railway (intento {attempt}/{max_retries}) - JobID: {job_id}")
             
             response = requests.post(
                 callback_url,
@@ -607,7 +552,7 @@ def send_enterprise_callback(callback_url: str, job_id: str, status: str,
             )
             
             if response.status_code == 200:
-                logger.info(f"✅ [PROCESS {process_id}] Callback enterprise exitoso - JobID: {job_id}")
+                logger.info(f"✅ [PROCESS {process_id}] Callback exitoso - JobID: {job_id}")
                 return
             else:
                 logger.warning(f"⚠️ [PROCESS {process_id}] Callback falló: HTTP {response.status_code}")
@@ -622,5 +567,5 @@ def send_enterprise_callback(callback_url: str, job_id: str, status: str,
             time.sleep(2)
     
     # Si falla, log pero no crash
-    logger.error(f"💥 [PROCESS {process_id}] Callback enterprise falló definitivamente - JobID: {job_id}")
-    logger.error(f"💡 [PROCESS {process_id}] Spring Boot debería tener la referencia. Revisar logs del backend.")
+    logger.error(f"💥 [PROCESS {process_id}] Callback falló definitivamente - JobID: {job_id}")
+    logger.error(f"💡 [PROCESS {process_id}] Revisar conectividad VPS->Railway o logs del backend.")
